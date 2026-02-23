@@ -1,7 +1,7 @@
 import { useState, useRef, useEffect } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import { Button } from "@/components/ui/button";
-import { Shield, Upload, Trash2, ArrowLeft, Eye, Edit2, Save, Check, X, Calendar, Database, BarChart3 } from "lucide-react";
+import { Shield, Upload, Trash2, ArrowLeft, Eye, Edit2, Save, Check, X, Calendar, Database, BarChart3, Lock, AlertTriangle } from "lucide-react";
 import { toast } from "@/hooks/use-toast";
 import { Link } from "react-router-dom";
 import * as XLSX from "xlsx";
@@ -331,6 +331,11 @@ const SourceSection = ({ source, data, onRefresh, lastUploadDate }: { source: So
 const DefectUpload = () => {
   const [defects, setDefects] = useState<StoredDefect[]>([]);
   const [loading, setLoading] = useState(true);
+  const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
+  const [deleteTarget, setDeleteTarget] = useState<"DVX" | "SCA" | "YARD" | "ALL" | "FINAL">("ALL");
+  const [deletePassword, setDeletePassword] = useState("");
+  const [deleteError, setDeleteError] = useState("");
+  const [deleting, setDeleting] = useState(false);
 
   const fetchDefects = async () => {
     setLoading(true);
@@ -349,7 +354,33 @@ const DefectUpload = () => {
   const getLastUploadDate = (source: Source): string | null => {
     const sourceData = defects.filter(d => d.source === source);
     if (sourceData.length === 0) return null;
-    return sourceData[0].uploaded_at; // Already sorted desc
+    return sourceData[0].uploaded_at;
+  };
+
+  const handleDelete = async () => {
+    if (!deletePassword.trim()) { setDeleteError("Enter password"); return; }
+    setDeleteError("");
+    setDeleting(true);
+    try {
+      const { data, error } = await supabase.functions.invoke("delete-defects", {
+        body: { password: deletePassword, target: deleteTarget },
+      });
+      if (error) throw error;
+      if (data?.error) {
+        setDeleteError(data.error);
+        setDeleting(false);
+        return;
+      }
+      toast({ title: "Deleted", description: `${deleteTarget} data deleted successfully.` });
+      setDeleteDialogOpen(false);
+      setDeletePassword("");
+      setDeleteTarget("ALL");
+      fetchDefects();
+    } catch (err: any) {
+      setDeleteError(err.message || "Delete failed");
+    } finally {
+      setDeleting(false);
+    }
   };
 
   // Dashboard stats
@@ -371,6 +402,12 @@ const DefectUpload = () => {
           <div>
             <h1 className="text-lg font-bold tracking-tight">Defect Data Upload</h1>
             <p className="text-[11px] text-muted-foreground">Upload defect data for DVX, SCA, and YARD teams</p>
+          </div>
+          <div className="ml-auto">
+            <Button size="sm" variant="destructive" className="gap-1.5" onClick={() => { setDeleteDialogOpen(true); setDeletePassword(""); setDeleteError(""); }}>
+              <Trash2 className="w-3.5 h-3.5" />
+              Delete Data
+            </Button>
           </div>
         </div>
       </header>
@@ -418,6 +455,60 @@ const DefectUpload = () => {
           ))
         )}
       </main>
+
+      {/* Delete Dialog */}
+      <Dialog open={deleteDialogOpen} onOpenChange={setDeleteDialogOpen}>
+        <DialogContent className="sm:max-w-[420px]">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2 text-destructive">
+              <AlertTriangle className="w-5 h-5" />
+              Delete Defect Data
+            </DialogTitle>
+          </DialogHeader>
+          <div className="space-y-4">
+            <p className="text-sm text-muted-foreground">
+              This will permanently delete data from the database. Select what to delete:
+            </p>
+            <div className="space-y-1.5">
+              <label className="text-xs font-semibold">Delete Target</label>
+              <select
+                value={deleteTarget}
+                onChange={(e) => setDeleteTarget(e.target.value as any)}
+                className="w-full px-3 py-2 text-sm border border-input rounded-md bg-background"
+              >
+                <option value="ALL">All Data (defect_data + final_defect)</option>
+                <option value="FINAL">Final Defect Data Only</option>
+                <option value="DVX">DVX Only</option>
+                <option value="SCA">SCA Only</option>
+                <option value="YARD">YARD Only</option>
+              </select>
+            </div>
+            <div className="space-y-1.5">
+              <label className="text-xs font-semibold flex items-center gap-1">
+                <Lock className="w-3 h-3" /> Password Required
+              </label>
+              <input
+                type="password"
+                value={deletePassword}
+                onChange={(e) => { setDeletePassword(e.target.value); setDeleteError(""); }}
+                placeholder="Enter delete password"
+                className="w-full px-3 py-2 text-sm border border-input rounded-md bg-background focus:outline-none focus:ring-2 focus:ring-ring"
+                onKeyDown={(e) => e.key === "Enter" && handleDelete()}
+                maxLength={50}
+              />
+            </div>
+            {deleteError && (
+              <p className="text-xs text-destructive font-semibold">{deleteError}</p>
+            )}
+            <div className="flex justify-end gap-2 pt-2">
+              <Button variant="outline" onClick={() => setDeleteDialogOpen(false)}>Cancel</Button>
+              <Button variant="destructive" onClick={handleDelete} disabled={deleting || !deletePassword.trim()}>
+                {deleting ? "Deleting..." : "Delete"}
+              </Button>
+            </div>
+          </div>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 };
