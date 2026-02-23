@@ -19,6 +19,7 @@ const headers = [
   "CVT", "SHOWER", "Dynamic/ UB", "CC4",
   "MFG", "Quality", "Plant",
   "Wokstation", "MFG", "Plant",
+  "Defect Code", "Defect Location Code",
   "MFG Action", "Resp", "Target",
 ];
 
@@ -46,6 +47,7 @@ export function exportToXLSX(data: QAMatrixEntry[], filename = "qa-matrix-export
     d.qControlDetail.DynamicUB, d.qControlDetail.CC4,
     d.controlRating.MFG, d.controlRating.Quality, d.controlRating.Plant,
     d.workstationStatus, d.mfgStatus, d.plantStatus,
+    d.defectCode, d.defectLocationCode,
     d.mfgAction, d.resp, d.target,
   ]);
 
