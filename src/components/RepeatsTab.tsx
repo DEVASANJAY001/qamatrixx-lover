@@ -1,10 +1,11 @@
-import { useState, useRef, useMemo } from "react";
+import { useState, useRef, useMemo, useEffect } from "react";
 import { QAMatrixEntry } from "@/types/qaMatrix";
 import { DVXEntry, MatchedRepeat, UnmatchedDefect } from "@/types/dvxReport";
 import { parseDVXSheet } from "@/utils/dvxParser";
 import { recalculateStatuses } from "@/utils/qaCalculations";
 import { exportToXLSX } from "@/utils/xlsxExport";
 import { fetchWorkbookFromUrl, isGoogleSheetsUrl } from "@/utils/googleSheetsImport";
+import { supabase } from "@/integrations/supabase/client";
 import Dashboard from "@/components/Dashboard";
 import MatrixDashboard from "@/components/MatrixDashboard";
 import QAMatrixTable from "@/components/QAMatrixTable";
@@ -18,7 +19,8 @@ import {
   DialogHeader,
   DialogTitle,
 } from "@/components/ui/dialog";
-import { Upload, Plus, AlertTriangle, CheckCircle, X, Search, Filter, FileSpreadsheet, ArrowUpCircle, Link2, Brain, Loader2, ChevronDown, ChevronRight, ListFilter, Download } from "lucide-react";
+import { Upload, Plus, AlertTriangle, CheckCircle, X, Search, Filter, FileSpreadsheet, ArrowUpCircle, Link2, Brain, Loader2, ChevronDown, ChevronRight, ListFilter, Download, Play, Calendar } from "lucide-react";
+import { toast } from "@/hooks/use-toast";
 import * as XLSX from "xlsx";
 
 interface UniqueDefectGroup {
@@ -61,6 +63,63 @@ const RepeatsTab = ({
   onWeeklyUpdate, onScoreUpdate, onFieldUpdate, onDeleteEntry, onDashboardFilter,
   onApplyToMatrix, onUnpair, onReassign, onManualPair, isApplied, isAIMatching,
 }: RepeatsTabProps) => {
+  const [lastDefectUpdate, setLastDefectUpdate] = useState<string | null>(null);
+  const [lastPairedDate, setLastPairedDate] = useState<string | null>(null);
+  const [pairingLoading, setPairingLoading] = useState(false);
+
+  // Fetch last updated dates
+  useEffect(() => {
+    const fetchDates = async () => {
+      const { data: defectData } = await supabase
+        .from("final_defect")
+        .select("created_at")
+        .order("created_at", { ascending: false })
+        .limit(1);
+      if (defectData && defectData.length > 0) {
+        setLastDefectUpdate(defectData[0].created_at);
+      }
+    };
+    fetchDates();
+  }, [dvxEntries]);
+
+  const handleStartPairing = async () => {
+    setPairingLoading(true);
+    try {
+      const { data: finalDefects, error } = await supabase
+        .from("final_defect")
+        .select("*")
+        .order("created_at", { ascending: false });
+      
+      if (error) throw error;
+      if (!finalDefects || finalDefects.length === 0) {
+        toast({ title: "No defect data", description: "Upload defect data first in the Defect Data page.", variant: "destructive" });
+        setPairingLoading(false);
+        return;
+      }
+
+      // Convert final_defect rows to DVXEntry format for the matching engine
+      const entries: DVXEntry[] = finalDefects.map((d, idx) => ({
+        date: new Date(d.created_at).toLocaleDateString(),
+        locationDetails: d.defect_location_code || "",
+        defectCode: d.defect_code || "",
+        defectDescription: d.defect_description_details?.split(" ").slice(0, 5).join(" ") || "",
+        defectDescriptionDetails: d.defect_description_details || "",
+        gravity: "",
+        quantity: 1,
+        source: d.source || "",
+        responsible: "",
+        pofFamily: "",
+        pofCode: "",
+      }));
+
+      setLastPairedDate(new Date().toISOString());
+      onFileUpload(entries, `Final Defect Data (${entries.length} records)`);
+    } catch (err: any) {
+      toast({ title: "Error", description: err.message, variant: "destructive" });
+    } finally {
+      setPairingLoading(false);
+    }
+  };
   const fileRef = useRef<HTMLInputElement>(null);
   const [uploadMode, setUploadMode] = useState<"file" | "link">("file");
   const [linkUrl, setLinkUrl] = useState("");
@@ -295,17 +354,53 @@ const RepeatsTab = ({
 
   return (
     <div className="space-y-6">
-      {/* Upload section */}
+      {/* Date info + Start Pairing */}
       <div className="bg-card border border-border rounded-lg p-5">
-        <div className="flex items-center gap-3 mb-4">
-          <Upload className="w-5 h-5 text-primary" />
-          <h2 className="text-sm font-bold">Upload Repeat Issues Report</h2>
-          {fileName && (
-            <Button size="sm" variant="ghost" onClick={handleClear} className="text-destructive ml-auto">
-              <X className="w-4 h-4 mr-1" /> Clear
+        <div className="flex items-center justify-between mb-4">
+          <div className="flex items-center gap-3">
+            <Play className="w-5 h-5 text-primary" />
+            <div>
+              <h2 className="text-sm font-bold">Defect Pairing</h2>
+              <div className="flex items-center gap-4 mt-1">
+                {lastDefectUpdate && (
+                  <span className="text-[10px] text-muted-foreground flex items-center gap-1">
+                    <Calendar className="w-3 h-3" />
+                    Defect data updated: {new Date(lastDefectUpdate).toLocaleString()}
+                  </span>
+                )}
+                {lastPairedDate && (
+                  <span className="text-[10px] text-primary flex items-center gap-1">
+                    <CheckCircle className="w-3 h-3" />
+                    Last paired: {new Date(lastPairedDate).toLocaleString()}
+                  </span>
+                )}
+              </div>
+            </div>
+          </div>
+          <div className="flex items-center gap-2">
+            <Button
+              size="sm"
+              className="gap-1.5"
+              onClick={handleStartPairing}
+              disabled={pairingLoading || isAIMatching}
+            >
+              {pairingLoading ? (
+                <><Loader2 className="w-4 h-4 animate-spin" />Loading Defects...</>
+              ) : (
+                <><Play className="w-4 h-4" />Start Pairing</>
+              )}
             </Button>
-          )}
+            {fileName && (
+              <Button size="sm" variant="ghost" onClick={handleClear} className="text-destructive">
+                <X className="w-4 h-4 mr-1" /> Clear
+              </Button>
+            )}
+          </div>
         </div>
+
+        <p className="text-xs text-muted-foreground mb-4">
+          Click <strong>Start Pairing</strong> to fetch defect data and match it with QA Matrix concerns using AI. Or upload a file manually below.
+        </p>
 
         {/* Mode toggle */}
         <div className="flex items-center gap-1 bg-muted rounded-lg p-0.5 w-fit mb-4">
