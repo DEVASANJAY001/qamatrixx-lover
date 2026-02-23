@@ -41,6 +41,33 @@ export type Database = {
         }
         Relationships: []
       }
+      final_defect: {
+        Row: {
+          created_at: string
+          defect_code: string
+          defect_description_details: string
+          defect_location_code: string
+          id: string
+          source: string
+        }
+        Insert: {
+          created_at?: string
+          defect_code?: string
+          defect_description_details?: string
+          defect_location_code?: string
+          id?: string
+          source?: string
+        }
+        Update: {
+          created_at?: string
+          defect_code?: string
+          defect_description_details?: string
+          defect_location_code?: string
+          id?: string
+          source?: string
+        }
+        Relationships: []
+      }
       qa_matrix_entries: {
         Row: {
           chassis: Json
