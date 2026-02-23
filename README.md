@@ -7,16 +7,17 @@ An automotive quality assurance application for tracking defects, managing quali
 ## Table of Contents
 
 1. [Overview](#overview)
-2. [Pages & Navigation](#pages--navigation)
-3. [QA Matrix Tab](#qa-matrix-tab)
-4. [Repeats Tab](#repeats-tab)
-5. [Defect Data Page](#defect-data-page)
-6. [Data Schema](#data-schema)
-7. [Status Calculation Logic](#status-calculation-logic)
-8. [Import & Export](#import--export)
-9. [AI Defect Matching](#ai-defect-matching)
-10. [Database](#database)
-11. [Tech Stack](#tech-stack)
+2. [System Architecture & Data Pipeline](#system-architecture--data-pipeline)
+3. [Pages & Navigation](#pages--navigation)
+4. [QA Matrix Tab](#qa-matrix-tab)
+5. [Repeats Tab — Defect Processing Pipeline](#repeats-tab--defect-processing-pipeline)
+6. [Defect Data Page](#defect-data-page)
+7. [Data Schema](#data-schema)
+8. [Status Calculation Logic](#status-calculation-logic)
+9. [Import & Export](#import--export)
+10. [AI Sentiment Analysis & Semantic Matching](#ai-sentiment-analysis--semantic-matching)
+11. [Database](#database)
+12. [Tech Stack](#tech-stack)
 
 ---
 
@@ -28,8 +29,63 @@ The QA Matrix system helps automotive quality teams:
 - **Monitor defect recurrence** with weekly tracking (W-6 to W-1)
 - **Score quality controls** across 50+ control points (T10–T100, C10–C80, F10–F100, etc.)
 - **Auto-calculate statuses** (OK/NG) for Workstation, MFG, and Plant levels
-- **Match defects to concerns** using AI-powered semantic matching
+- **Match defects to concerns** using AI-powered sentiment analysis & semantic matching
 - **Upload & manage defect data** from DVX, SCA, and YARD sources
+
+---
+
+## System Architecture & Data Pipeline
+
+The system follows a structured data pipeline similar to a Python ML/NLP workflow:
+
+```
+┌─────────────────────────────────────────────────────────────────────────┐
+│                        DATA PIPELINE OVERVIEW                          │
+├─────────────────────────────────────────────────────────────────────────┤
+│                                                                         │
+│  1. DATA INGESTION          Raw data upload (CSV/Excel/Google Sheets)   │
+│         │                                                               │
+│         ▼                                                               │
+│  2. DATA PREPROCESSING      Parsing, cleaning, type casting,           │
+│         │                   null handling, deduplication                │
+│         ▼                                                               │
+│  3. DATA SEPARATION         Split by source (DVX/SCA/YARD),           │
+│         │                   store in raw + consolidated tables          │
+│         ▼                                                               │
+│  4. FEATURE EXTRACTION      Extract key features: defect description,  │
+│         │                   location, gravity, defect code             │
+│         ▼                                                               │
+│  5. SENTIMENT ANALYSIS      AI-powered semantic understanding of       │
+│         │                   defect descriptions using NLP (Gemini)     │
+│         ▼                                                               │
+│  6. PAIRING / MATCHING      Match defects → QA concerns using          │
+│         │                   cosine-like semantic similarity            │
+│         ▼                                                               │
+│  7. POST-PROCESSING         Confidence filtering, manual review,       │
+│         │                   reassignment, new concern creation         │
+│         ▼                                                               │
+│  8. AGGREGATION             Update recurrence counts, recalculate      │
+│         │                   ratings and statuses                       │
+│         ▼                                                               │
+│  9. VISUALIZATION           Dashboard, matrix view, status badges,     │
+│                             charts, filtered table views               │
+│                                                                         │
+└─────────────────────────────────────────────────────────────────────────┘
+```
+
+### Pipeline Stage Details
+
+| Stage | Python Equivalent | Description |
+|-------|-------------------|-------------|
+| **Data Ingestion** | `pandas.read_excel()` / `pandas.read_csv()` | Upload raw defect data from Excel/CSV files or Google Sheets URLs |
+| **Data Preprocessing** | `df.dropna()`, `df.astype()`, `df.fillna()` | Parse raw file data, clean empty rows, cast types (numbers, strings), handle null/missing values, validate required fields |
+| **Data Separation** | `df.groupby('source')` | Split incoming data by source type (DVX, SCA, YARD) and store into separate database collections (raw `defect_data` + consolidated `final_defect`) |
+| **Feature Extraction** | `sklearn.feature_extraction` | Extract meaningful features from each defect: `defect_description`, `location_details`, `defect_code`, `gravity`, `quantity` — structured for AI consumption |
+| **Sentiment Analysis** | `transformers.pipeline('sentiment-analysis')` | AI (Google Gemini) performs deep semantic understanding of defect descriptions — goes beyond keyword matching to understand the actual manufacturing problem (e.g., "scratch on panel" ≈ "surface damage on body part") |
+| **Pairing / Matching** | `sklearn.metrics.pairwise.cosine_similarity()` | Semantic similarity matching between defect descriptions and QA concern descriptions. Each match returns a confidence score (0–1) analogous to cosine similarity |
+| **Post-Processing** | `df.loc[df['confidence'] >= threshold]` | Filter matches by confidence threshold (≥ 0.3), allow manual review/reassignment, create new concerns for unmatched defects |
+| **Aggregation** | `df.groupby('concern').agg({'quantity': 'sum'})` | Sum matched defect quantities per concern, update W-1 recurrence counts, recalculate MFG/Quality/Plant ratings and OK/NG statuses |
+| **Visualization** | `matplotlib` / `seaborn` / `plotly` | Interactive dashboards with charts, status badges, filterable matrix table, diff views for applied changes |
 
 ---
 
@@ -42,7 +98,7 @@ The QA Matrix system helps automotive quality teams:
 
 The main page has two tabs:
 - **QA Matrix** — View/edit the full quality matrix table with dashboard
-- **Repeats** — Match defect data against QA concerns and apply recurrence updates
+- **Repeats** — Defect processing pipeline: matching, pairing, and recurrence updates
 
 ---
 
@@ -108,47 +164,118 @@ The table displays all QA concerns with 80+ columns organized into sections:
 
 ---
 
-## Repeats Tab
+## Repeats Tab — Defect Processing Pipeline
 
-The Repeats tab is the core workflow for updating the QA Matrix with new defect data.
+The Repeats tab executes the core **data processing pipeline** for updating the QA Matrix with new defect data.
 
-### Workflow
+### Pipeline Execution Workflow
 
-1. **Start Pairing** — Fetches all defect data from the database (final_defect table) and triggers AI matching
-2. **AI Matching** — The system sends defects to an AI agent that semantically matches each defect to the most relevant QA concern
-3. **Review Matches** — View matched pairs and unmatched defects
-4. **Manual Adjustments**:
-   - **Unpair** — Remove a defect from a matched concern
-   - **Reassign** — Move a defect to a different concern
-   - **Manual Pair** — Pair an unmatched defect to an existing concern
-   - **Add New Concern** — Create a new QA concern from an unmatched defect
-5. **Apply to Matrix** — Updates W-1 (Last Week) recurrence counts for all matched concerns
-6. **View Changes** — See a diff of what changed (recurrence counts, status changes)
-7. **Undo** — Revert all applied changes
+```
+┌──────────────┐    ┌──────────────────┐    ┌───────────────────┐
+│  1. FETCH    │───▶│  2. PREPROCESS   │───▶│  3. FEATURE       │
+│  Raw Data    │    │  Clean & Parse   │    │  EXTRACTION       │
+└──────────────┘    └──────────────────┘    └───────────────────┘
+                                                     │
+                                                     ▼
+┌──────────────┐    ┌──────────────────┐    ┌───────────────────┐
+│  6. POST-    │◀───│  5. PAIRING      │◀───│  4. SENTIMENT     │
+│  PROCESSING  │    │  Match → Concern │    │  ANALYSIS (AI)    │
+└──────────────┘    └──────────────────┘    └───────────────────┘
+       │
+       ▼
+┌──────────────┐    ┌──────────────────┐
+│  7. APPLY &  │───▶│  8. VISUALIZE    │
+│  AGGREGATE   │    │  Diff & Status   │
+└──────────────┘    └──────────────────┘
+```
 
-### Alternative Upload Methods
+### Step-by-Step Breakdown
 
-- **File Upload** — Upload a DVX/Repeat Issues Excel file directly
-- **Google Sheets Link** — Fetch data from a public Google Sheets URL
+#### Step 1: Data Fetching (Ingestion)
+- **Trigger**: User clicks "Start Pairing"
+- **Operation**: Fetches all records from `final_defect` table
+- **Python equivalent**: `df = pd.read_sql("SELECT * FROM final_defect", conn)`
 
-### Unique Defects View
+#### Step 2: Data Preprocessing
+- **Operation**: Clean raw defect entries, normalize text fields, handle missing values
+- **Transforms**: Strip whitespace, standardize casing, fill empty fields with defaults
+- **Python equivalent**: `df['description'] = df['description'].str.strip().str.lower()`
 
-A collapsible section showing all unique defect types grouped by defect code/description, sorted by total quantity. Exportable to Excel.
+#### Step 3: Feature Extraction
+- **Operation**: Extract structured features from each defect for AI consumption
+- **Features**: `locationDetails`, `defectDescription`, `defectDescriptionDetails`, `gravity`, `quantity`
+- **Python equivalent**: `features = df[['location', 'description', 'details', 'gravity', 'quantity']]`
+
+#### Step 4: Sentiment Analysis & Semantic Understanding (AI)
+- **Operation**: Send defect descriptions to Google Gemini AI for deep semantic analysis
+- **Process**: The AI understands the *meaning* of each defect — not just keywords
+- **Example**: "Rayure panneau" (scratch on panel) is semantically matched to "Surface damage on body exterior"
+- **Batching**: Processed in batches of 200 defects to avoid token limits
+- **Python equivalent**: 
+  ```python
+  from transformers import pipeline
+  nlp = pipeline('text-classification', model='gemini-flash')
+  embeddings = nlp(defect_descriptions)
+  ```
+
+#### Step 5: Pairing / Matching
+- **Operation**: Match each defect to the most semantically similar QA concern
+- **Output**: Each match contains `{ defectIndex, matchedSNo, confidence, reason }`
+- **Confidence threshold**: Matches with confidence < 0.3 are treated as unmatched
+- **Python equivalent**:
+  ```python
+  from sklearn.metrics.pairwise import cosine_similarity
+  similarity_matrix = cosine_similarity(defect_embeddings, concern_embeddings)
+  best_matches = similarity_matrix.argmax(axis=1)
+  ```
+
+#### Step 6: Post-Processing & Manual Review
+- **Unpair** — Remove incorrect AI matches (`df.drop(index)`)
+- **Reassign** — Move a defect to a different concern (`df.loc[idx, 'concern'] = new_sno`)
+- **Manual Pair** — Force-pair an unmatched defect (`df.at[idx, 'matched'] = True`)
+- **Add New Concern** — Create a new QA matrix entry from an unmatched defect (`df.append(new_row)`)
+
+#### Step 7: Aggregation & Apply
+- **Operation**: Sum matched defect quantities per concern, update W-1 recurrence column
+- **Recalculation**: Triggers full status recalculation (MFG/Quality/Plant ratings, OK/NG statuses)
+- **Python equivalent**:
+  ```python
+  recurrence_updates = matched_df.groupby('matched_sno')['quantity'].sum()
+  qa_matrix['W-1'] = qa_matrix['sNo'].map(recurrence_updates).fillna(0)
+  ```
+
+#### Step 8: Visualization & Diff
+- **View Changes** — See a before/after diff of recurrence counts and status changes
+- **Undo** — Revert all applied changes (rollback to pre-pipeline state)
+
+### Alternative Data Ingestion Methods
+
+- **File Upload** — Upload a DVX/Repeat Issues Excel file directly (bypasses database fetch)
+- **Google Sheets Link** — Fetch data from a public Google Sheets URL via proxy
+
+### Unique Defects View (Exploratory Data Analysis)
+
+A collapsible EDA section showing all unique defect types:
+- **Grouping**: `df.groupby(['defect_code', 'description']).agg({'quantity': 'sum'})`
+- **Sorting**: By total quantity (descending)
+- **Export**: Download grouped results as Excel
 
 ---
 
 ## Defect Data Page
 
-Manage raw defect data organized by source:
+Manage raw defect data — the **data ingestion & storage layer** of the pipeline.
 
-### Sources
+### Sources (Data Separation)
 - **DVX** — DVX inspection defects
 - **SCA** — SCA audit defects  
 - **YARD** — Yard inspection defects
 
+Each source is stored and managed independently (`df.groupby('source')`).
+
 ### Features per Source
-- **Upload CSV/Excel** — Parse and preview before uploading
-- **Preview & Edit** — Review parsed data, edit cells, delete rows before confirming upload
+- **Upload CSV/Excel** — Parse and preview before uploading (preprocessing step)
+- **Preview & Edit** — Review parsed data, edit cells, delete rows before confirming upload (data cleaning)
 - **Review** — View all stored data for a source
 - **Clear All** — Delete all data for a source
 
@@ -158,10 +285,23 @@ Manage raw defect data organized by source:
 - Enter password to confirm deletion
 - Data is permanently removed from the database
 
-### Data Flow
-When defect data is uploaded, it is stored in two tables:
-1. `defect_data` — Raw upload history with timestamps
-2. `final_defect` — Consolidated defect records used by the Repeats pairing engine
+### Data Flow (ETL Pipeline)
+
+```
+┌─────────────┐     ┌──────────────────┐     ┌─────────────────┐
+│  Raw File   │────▶│  PREPROCESSING   │────▶│  defect_data    │
+│  (CSV/XLSX) │     │  Parse, Clean,   │     │  (Raw Storage)  │
+│             │     │  Validate        │     │                 │
+└─────────────┘     └──────────────────┘     └─────────────────┘
+                                                      │
+                                                      ▼
+                                              ┌─────────────────┐
+                                              │  final_defect   │
+                                              │  (Consolidated) │
+                                              │  Used by AI     │
+                                              │  Pairing Engine │
+                                              └─────────────────┘
+```
 
 ---
 
@@ -208,25 +348,37 @@ When defect data is uploaded, it is stored in two tables:
 
 ## Status Calculation Logic
 
-Statuses are **auto-calculated** whenever scores or recurrence values change:
+Statuses are **auto-calculated** whenever scores or recurrence values change (similar to `df.apply(calculate_status, axis=1)`):
 
 ### MFG Rating
-```
-MFG Rating = Sum of all non-null values in (Trim + Chassis + Final scores)
-             (excluding Residual Torque)
+```python
+# MFG Rating = Sum of all non-null values in (Trim + Chassis + Final scores)
+#              (excluding Residual Torque)
+mfg_rating = df[trim_cols + chassis_cols + final_cols].sum(axis=1, skipna=True)
 ```
 
 ### Quality Rating
-```
-Quality Rating = Sum of all non-null Quality Control scores (1.1 to 5.3)
+```python
+# Quality Rating = Sum of all non-null Quality Control scores (1.1 to 5.3)
+quality_rating = df[qcontrol_cols].sum(axis=1, skipna=True)
 ```
 
 ### Plant Rating
-```
-Plant Rating = Sum of (Residual Torque + all QControl scores + all QControl Detail scores)
+```python
+# Plant Rating = Sum of (Residual Torque + all QControl scores + all QControl Detail scores)
+plant_rating = df[['ResidualTorque'] + qcontrol_cols + qcontrol_detail_cols].sum(axis=1, skipna=True)
 ```
 
 ### Status Rules
+```python
+# Vectorized status calculation
+df['workstation_status'] = np.where(
+    (df['recurrence'] == 0) & (df['mfg_rating'] >= df['defect_rating']),
+    'OK', 'NG'
+)
+df['mfg_status'] = np.where(df['mfg_rating'] >= df['defect_rating'], 'OK', 'NG')
+df['plant_status'] = np.where(df['plant_rating'] >= df['defect_rating'], 'OK', 'NG')
+```
 
 | Status | Condition |
 |--------|-----------|
@@ -278,52 +430,102 @@ Both exports use the same column format as imports, so exported files can be re-
 
 ---
 
-## AI Defect Matching
+## AI Sentiment Analysis & Semantic Matching
 
-The system uses an AI model (Google Gemini) to semantically match defects to QA concerns.
+The system uses an AI model (Google Gemini) to perform **sentiment analysis** and **semantic matching** of defects to QA concerns.
+
+### NLP Pipeline
+
+```
+┌─────────────────┐     ┌──────────────────────┐     ┌─────────────────┐
+│  Input Defects  │────▶│  TOKENIZATION &      │────▶│  SEMANTIC       │
+│  (Raw Text)     │     │  EMBEDDING           │     │  UNDERSTANDING  │
+│                 │     │  (Gemini NLP Engine)  │     │  (Context-aware)│
+└─────────────────┘     └──────────────────────┘     └─────────────────┘
+                                                              │
+                                                              ▼
+┌─────────────────┐     ┌──────────────────────┐     ┌─────────────────┐
+│  Matched Pairs  │◀────│  CONFIDENCE          │◀────│  SIMILARITY     │
+│  + Scores       │     │  SCORING (0–1)       │     │  MATCHING       │
+│                 │     │  + Reasoning         │     │  (vs QA Matrix) │
+└─────────────────┘     └──────────────────────┘     └─────────────────┘
+```
 
 ### How It Works
 
-1. All QA concerns are sent to the AI with their S.No, concern text, station, and designation
-2. All defects are sent with their location, description, details, and gravity
-3. The AI analyzes semantic meaning — not just keyword matching — to find the best match
-4. Each match includes a confidence score (0–1) and a reason
-5. Matches with confidence < 0.3 are treated as unmatched
-6. Results are processed in batches of 200 defects for efficiency
+1. **Tokenization**: Defect descriptions are processed by the Gemini NLP engine
+2. **Semantic Embedding**: The AI creates internal representations of meaning — not surface-level keywords
+3. **Similarity Matching**: Each defect embedding is compared against all QA concern embeddings
+4. **Confidence Scoring**: Each match receives a confidence score (0–1) — similar to cosine similarity
+5. **Reasoning**: The AI provides a human-readable explanation for each match/non-match
+6. **Threshold Filtering**: Matches with confidence < 0.3 are classified as unmatched
+7. **Batching**: Processed in batches of 200 defects for efficiency (avoiding token limits)
+
+### Python Equivalent
+
+```python
+from transformers import AutoModel, AutoTokenizer
+import torch
+from sklearn.metrics.pairwise import cosine_similarity
+
+# Load model
+model = AutoModel.from_pretrained('google/gemini-flash')
+tokenizer = AutoTokenizer.from_pretrained('google/gemini-flash')
+
+# Encode defects and concerns
+defect_embeddings = model.encode(defect_descriptions)
+concern_embeddings = model.encode(concern_descriptions)
+
+# Compute similarity matrix
+similarity = cosine_similarity(defect_embeddings, concern_embeddings)
+
+# Get best matches with confidence
+best_matches = similarity.argmax(axis=1)
+confidence_scores = similarity.max(axis=1)
+
+# Filter low-confidence matches
+matched = confidence_scores >= 0.3
+results = pd.DataFrame({
+    'defect_index': range(len(defects)),
+    'matched_sno': np.where(matched, concerns[best_matches]['sNo'], None),
+    'confidence': confidence_scores
+})
+```
 
 ### Backend Function
 
 The `match-defects` edge function handles the AI communication:
 - Uses the Lovable AI Gateway (`ai.gateway.lovable.dev`)
-- Employs function calling for structured output
+- Employs function calling for structured JSON output
 - Handles rate limiting (429) and credit depletion (402) gracefully
+- Processes defects in parallel batches for performance
 
 ---
 
 ## Database
 
-### Tables
+### Tables (Data Storage Layer)
 
-| Table | Purpose |
-|-------|---------|
-| `qa_matrix_entries` | All QA Matrix concerns with scores, statuses, and metadata |
-| `defect_data` | Raw uploaded defect data with source and timestamp |
-| `final_defect` | Consolidated defect records for AI pairing |
+| Table | Purpose | Python Equivalent |
+|-------|---------|-------------------|
+| `qa_matrix_entries` | All QA Matrix concerns with scores, statuses, and metadata | `qa_matrix_df` — main DataFrame |
+| `defect_data` | Raw uploaded defect data with source and timestamp | `raw_defects_df` — raw upload history |
+| `final_defect` | Consolidated defect records for AI pairing | `clean_defects_df` — preprocessed & ready for NLP |
 
-### Auto-Save
+### Auto-Save (Incremental Updates)
 
-All changes to the QA Matrix table are automatically saved to the database. The system:
-- Detects changed entries via JSON comparison
-- Upserts only modified rows (by `s_no`)
-- Supports batch saves for imports and bulk updates
+All changes to the QA Matrix table are automatically saved to the database:
+- **Change Detection**: JSON diff comparison (`df.compare(df_original)`)
+- **Upsert Strategy**: Only modified rows are saved (by `s_no` primary key)
+- **Batch Processing**: Supports bulk saves for imports and pipeline updates
 
-### Edge Functions
+### Edge Functions (Backend Microservices)
 
-| Function | Purpose |
-|----------|---------|
-| `match-defects` | AI-powered semantic matching of defects to QA concerns |
-| `delete-defects` | Password-protected deletion of defect data |
-| `fetch-spreadsheet` | Proxy for fetching external spreadsheet URLs |
+| Function | Purpose | Python Equivalent |
+|----------|---------|-------------------|
+| `match-defects` | AI-powered semantic matching of defects to QA concerns | `sklearn` similarity pipeline |
+| `delete-defects` | Password-protected deletion of defect data | `df.drop()` with auth |
+| `fetch-spreadsheet` | Proxy for fetching external spreadsheet URLs | `requests.get()` proxy |
 
 ---
 
@@ -331,8 +533,8 @@ All changes to the QA Matrix table are automatically saved to the database. The 
 
 - **Frontend**: React 18 + TypeScript + Vite
 - **Styling**: Tailwind CSS + shadcn/ui components
-- **Database**: Lovable Cloud (PostgreSQL)
-- **AI**: Google Gemini via Lovable AI Gateway
-- **File Parsing**: SheetJS (xlsx) for Excel/CSV import/export
-- **State Management**: React hooks + custom `useQAMatrixDB` hook
-- **Charts**: Recharts (dashboard visualizations)
+- **Database**: Lovable Cloud (PostgreSQL) — equivalent to `SQLAlchemy + PostgreSQL`
+- **AI/NLP**: Google Gemini via Lovable AI Gateway — equivalent to `transformers + sklearn`
+- **File Parsing**: SheetJS (xlsx) — equivalent to `pandas.read_excel()` / `openpyxl`
+- **State Management**: React hooks + custom `useQAMatrixDB` hook — equivalent to `pandas DataFrame` in-memory
+- **Charts**: Recharts — equivalent to `matplotlib` / `plotly`
