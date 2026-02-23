@@ -79,9 +79,25 @@ const SourceSection = ({ source, data, onRefresh }: { source: Source; data: Stor
         toast({ title: "No data found", description: "The file has no valid rows.", variant: "destructive" });
         return;
       }
+      // Insert into defect_data
       const insertRows = rows.map(r => ({ ...r, source }));
       const { error } = await supabase.from("defect_data").insert(insertRows);
       if (error) throw error;
+
+      // Also insert into final_defect (filtered: only defect_code, defect_location_code, defect_description_details)
+      const finalRows = rows
+        .filter(r => r.defect_code || r.defect_description_details)
+        .map(r => ({
+          defect_code: r.defect_code,
+          defect_location_code: r.defect_location_code,
+          defect_description_details: r.defect_description_details,
+          source,
+        }));
+      if (finalRows.length > 0) {
+        const { error: finalError } = await supabase.from("final_defect").insert(finalRows);
+        if (finalError) console.error("final_defect insert error:", finalError);
+      }
+
       toast({ title: "Upload successful", description: `${rows.length} defects uploaded for ${source}.` });
       onRefresh();
     } catch (err: any) {

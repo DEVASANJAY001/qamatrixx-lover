@@ -12,14 +12,14 @@ import { DVXEntry, MatchedRepeat, UnmatchedDefect } from "@/types/dvxReport";
 import { recalculateStatuses } from "@/utils/qaCalculations";
 import { exportToCSV } from "@/utils/csvExport";
 import { exportToXLSX } from "@/utils/xlsxExport";
-import { qaMatrixData } from "@/data/qaMatrixData";
 import { aiMatchDefects } from "@/utils/aiMatch";
-import { Shield, Search, Filter, X, Download, FileSpreadsheet, RotateCcw, Repeat, Undo2, Database } from "lucide-react";
+import { useQAMatrixDB } from "@/hooks/useQAMatrixDB";
+import { Shield, Search, Filter, X, Download, FileSpreadsheet, RotateCcw, Repeat, Undo2, Database, Loader2 } from "lucide-react";
 import { toast } from "@/hooks/use-toast";
 import { Button } from "@/components/ui/button";
 
 const Index = () => {
-  const [data, setData] = useState<QAMatrixEntry[]>(qaMatrixData);
+  const { data, loading: dbLoading, updateData: dbUpdateData, fetchData: refreshFromDB, saveMultiple, deleteEntry: dbDeleteEntry } = useQAMatrixDB();
   const [activeTab, setActiveTab] = useState<"matrix" | "repeats">("matrix");
   const [dashboardView, setDashboardView] = useState<"summary" | "matrix-dashboard">("summary");
   const [filter, setFilter] = useState<{ rating?: 1 | 3 | 5; level?: string; status?: "OK" | "NG" } | null>(null);
@@ -46,9 +46,7 @@ const Index = () => {
   const sources = useMemo(() => [...new Set(data.map(d => d.source))].sort(), [data]);
   const designations = useMemo(() => [...new Set(data.map(d => d.designation.toUpperCase()))].sort(), [data]);
 
-  const updateData = (updater: (prev: QAMatrixEntry[]) => QAMatrixEntry[]) => {
-    setData(prev => updater(prev));
-  };
+  const updateData = dbUpdateData;
 
   const handleWeeklyUpdate = (sNo: number, weekIndex: number, value: number) => {
     updateData(prev => prev.map(entry => {
@@ -80,14 +78,17 @@ const Index = () => {
 
   const handleDeleteEntry = (sNo: number) => {
     updateData(prev => prev.filter(entry => entry.sNo !== sNo));
+    dbDeleteEntry(sNo);
   };
 
   const handleFileImport = (entries: QAMatrixEntry[]) => {
     updateData(prev => [...prev, ...entries]);
+    saveMultiple(entries);
   };
 
   const handleAddConcern = (entry: QAMatrixEntry) => {
     updateData(prev => [...prev, entry]);
+    saveMultiple([entry]);
   };
 
   const handleDashboardFilter = (filterType: string, filterValue: string) => {
@@ -160,9 +161,10 @@ const Index = () => {
 
   const handleRepeatAddConcern = useCallback((entry: QAMatrixEntry) => {
     const newData = [...data, entry];
-    setData(newData);
+    updateData(() => newData);
+    saveMultiple([entry]);
     runMatching(dvxEntries, newData);
-  }, [dvxEntries, runMatching, data]);
+  }, [dvxEntries, runMatching, data, updateData, saveMultiple]);
 
   const handleRepeatClear = useCallback(() => {
     setDvxEntries([]);
@@ -259,7 +261,7 @@ const Index = () => {
     setPreApplySnapshot([...data.map(d => ({ ...d, weeklyRecurrence: [...d.weeklyRecurrence] }))]);
 
     const diffs: DiffEntry[] = [];
-    setData(prev => {
+    updateData(prev => {
       return prev.map(entry => {
         const m = matched.find(m => m.qaSNo === entry.sNo);
         if (!m) return entry;
@@ -296,7 +298,7 @@ const Index = () => {
   // Feature 3: Undo apply
   const handleUndoApply = useCallback(() => {
     if (preApplySnapshot) {
-      setData(preApplySnapshot);
+      updateData(() => preApplySnapshot);
       setPreApplySnapshot(null);
       setIsRepeatApplied(false);
       setDiffEntries([]);
@@ -393,7 +395,7 @@ const Index = () => {
                     </Button>
                   </>
                 )}
-                <Button size="sm" variant="ghost" className="gap-1.5 text-destructive" onClick={() => { setData(qaMatrixData); setIsRepeatApplied(false); setPreApplySnapshot(null); setDiffEntries([]); }} title="Reset to original data">
+                <Button size="sm" variant="ghost" className="gap-1.5 text-destructive" onClick={() => { refreshFromDB(); setIsRepeatApplied(false); setPreApplySnapshot(null); setDiffEntries([]); }} title="Reload from database">
                   <RotateCcw className="w-4 h-4" />
                   Reset
                 </Button>
@@ -411,7 +413,12 @@ const Index = () => {
       </header>
 
       <main className="max-w-[1800px] mx-auto px-4 py-6 space-y-6">
-        {activeTab === "matrix" ? (
+        {dbLoading ? (
+          <div className="flex items-center justify-center py-20 gap-2 text-muted-foreground">
+            <Loader2 className="w-5 h-5 animate-spin" />
+            <span className="text-sm">Loading QA Matrix from database...</span>
+          </div>
+        ) : activeTab === "matrix" ? (
           <>
             <Dashboard data={data} onFilterByCategory={handleDashboardFilter} />
 
