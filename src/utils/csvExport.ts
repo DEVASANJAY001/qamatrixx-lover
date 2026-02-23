@@ -15,6 +15,7 @@ export function exportToCSV(data: QAMatrixEntry[], filename = "qa-matrix-export.
     "CVT", "SHOWER", "Dynamic/UB", "CC4",
     "CTRL MFG", "CTRL Qty", "CTRL Plant",
     "WS Status", "MFG Status", "Plant Status",
+    "Defect Code", "Defect Location Code",
     "MFG Action", "Resp", "Target"
   ];
 
@@ -32,6 +33,8 @@ export function exportToCSV(data: QAMatrixEntry[], filename = "qa-matrix-export.
     d.qControlDetail.CVT ?? "", d.qControlDetail.SHOWER ?? "", d.qControlDetail.DynamicUB ?? "", d.qControlDetail.CC4 ?? "",
     d.controlRating.MFG, d.controlRating.Quality, d.controlRating.Plant,
     d.workstationStatus, d.mfgStatus, d.plantStatus,
+    `"${(d.defectCode || "").replace(/"/g, '""')}"`,
+    `"${(d.defectLocationCode || "").replace(/"/g, '""')}"`,
     `"${(d.mfgAction || "").replace(/"/g, '""')}"`,
     d.resp, d.target
   ]);
