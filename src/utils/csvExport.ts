@@ -7,22 +7,31 @@ const qControlKeys = ["freqControl_1_1","visualControl_1_2","periodicAudit_1_3",
 
 export function exportToCSV(data: QAMatrixEntry[], filename = "qa-matrix-export.csv") {
   const headers = [
-    "S.No", "Source", "Station", "Area", "Concern", "Defect Rating",
-    "W-6", "W-5", "W-4", "W-3", "W-2", "W-1", "RC+DR",
-    ...trimKeys, ...chassisKeys, ...finalKeys,
-    "Residual Torque",
-    "1.1", "1.2", "1.3", "1.4", "3.1", "3.2", "3.3", "3.4", "5.1", "5.2", "5.3",
-    "CVT", "SHOWER", "Dynamic/UB", "CC4",
-    "CTRL MFG", "CTRL Qty", "CTRL Plant",
-    "WS Status", "MFG Status", "Plant Status",
-    "Defect Code", "Defect Location Code",
+    "S.No", "Source", "Operation Station", "Designation of the operation",
+    "Concern Discerption [Mode of failure]", "Defect code", "Location code",
+    "Defect Rating (1/3/5)", "Reccurence",
+    "Last 6 Weeks", "Last 5 Weeks", "Last 4 Weeks", "Last 3 Weeks", "Last 2 Weeks", "Last Week",
+    "Reccurence Count+Defect Rating",
+    ...trimKeys,
+    "C10","C20","C30","C40","C45","P10","P20","P30","C50","C60","C70","R/Sub","T/S","C80","C PQG",
+    ...finalKeys, "Residual Torque",
+    "1.1: Frequency Control", "1.2:Visual Control", "1.3:Periodic audit Process monitoring",
+    "1.4:100% Human Control without tracking", "3.1:SAE(Error Proofing) alert",
+    "3.2:Frequency control (Measurements)", "3.3:100% Manual control in the line with tool",
+    "3.4:100% human control with tracking", "5.1:100% automatic control",
+    "5.2:Impossibility of assembly or subsequent machining", "5.3:SAE(Error proofing) Prohibition",
+    "CVT", "SHOWER", "Dynamic/ UB", "CC4",
+    "MFG", "Quality", "Plant",
+    "Wokstation", "MFG", "Plant",
     "MFG Action", "Resp", "Target"
   ];
 
   const rows = data.map(d => [
     d.sNo, d.source, d.operationStation, d.designation,
     `"${d.concern.replace(/"/g, '""')}"`,
-    d.defectRating,
+    `"${(d.defectCode || "").replace(/"/g, '""')}"`,
+    `"${(d.defectLocationCode || "").replace(/"/g, '""')}"`,
+    d.defectRating, d.recurrence,
     ...d.weeklyRecurrence,
     d.recurrenceCountPlusDefect,
     ...trimKeys.map(k => d.trim[k] ?? ""),
@@ -33,8 +42,6 @@ export function exportToCSV(data: QAMatrixEntry[], filename = "qa-matrix-export.
     d.qControlDetail.CVT ?? "", d.qControlDetail.SHOWER ?? "", d.qControlDetail.DynamicUB ?? "", d.qControlDetail.CC4 ?? "",
     d.controlRating.MFG, d.controlRating.Quality, d.controlRating.Plant,
     d.workstationStatus, d.mfgStatus, d.plantStatus,
-    `"${(d.defectCode || "").replace(/"/g, '""')}"`,
-    `"${(d.defectLocationCode || "").replace(/"/g, '""')}"`,
     `"${(d.mfgAction || "").replace(/"/g, '""')}"`,
     d.resp, d.target
   ]);
