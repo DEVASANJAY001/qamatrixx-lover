@@ -1,169 +1,142 @@
 import { Link } from "react-router-dom";
-import { Shield, Database, Brain, FileSpreadsheet, BarChart3, Upload, ArrowRight, Repeat, CheckCircle2, Server, Layout, Cpu, Layers, Code2, Terminal, GitBranch, Zap, ArrowDown } from "lucide-react";
+import { Shield, Database, Brain, FileSpreadsheet, BarChart3, Upload, ArrowRight, CheckCircle2, Server, Layout, Cpu, Layers, Code2, Terminal, ArrowDown, RefreshCw, AlertTriangle, Settings } from "lucide-react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import Footer from "@/components/Footer";
 
-const phases = [
+// ─── Closed-Loop Workflow Data ─────────────────────────────────────────
+
+const closedLoopSteps = [
   {
-    phase: "Phase 1",
-    title: "Data Collection",
-    color: "bg-red-100 dark:bg-red-900/30",
+    id: 1,
+    title: "Data Ingestion",
+    subtitle: "Excel / CSV Upload",
+    desc: "QA Matrix and defect reports (DVX, SCA, YARD) are uploaded. Auto-header detection parses columns, validates data types, and normalizes entries.",
+    color: "border-red-400 dark:border-red-600",
+    bg: "bg-red-50 dark:bg-red-950/30",
     accent: "text-red-600 dark:text-red-400",
-    borderColor: "border-red-200 dark:border-red-800",
     icon: Upload,
-    steps: [
-      "Upload QA Matrix via Excel (.xlsx)",
-      "Import defect reports (DVX/SCA/YARD)",
-      "Capture defect codes & location codes",
-      "Parse and validate raw data",
-    ],
   },
   {
-    phase: "Phase 2",
-    title: "Processing & Matching",
-    color: "bg-purple-100 dark:bg-purple-900/30",
+    id: 2,
+    title: "Preprocessing",
+    subtitle: "Cleaning & Separation",
+    desc: "Raw data is cleaned, deduplicated, and separated by source. Defect codes and location codes are extracted and validated against known patterns.",
+    color: "border-orange-400 dark:border-orange-600",
+    bg: "bg-orange-50 dark:bg-orange-950/30",
+    accent: "text-orange-600 dark:text-orange-400",
+    icon: Settings,
+  },
+  {
+    id: 3,
+    title: "AI Semantic Matching",
+    subtitle: "Google Gemini NLP",
+    desc: "Defects are batched and sent to Google Gemini for semantic analysis. The AI evaluates descriptions, locations, and component types to pair each defect with the best-fit QA concern.",
+    color: "border-purple-400 dark:border-purple-600",
+    bg: "bg-purple-50 dark:bg-purple-950/30",
     accent: "text-purple-600 dark:text-purple-400",
-    borderColor: "border-purple-200 dark:border-purple-800",
     icon: Brain,
-    steps: [
-      "AI semantic analysis (Google Gemini)",
-      "Defect-to-concern pairing",
-      "Confidence scoring (threshold ≥ 0.3)",
-      "Manual review & reassignment",
-    ],
   },
   {
-    phase: "Phase 3",
-    title: "Analysis & Calculation",
-    color: "bg-green-100 dark:bg-green-900/30",
+    id: 4,
+    title: "Confidence Filtering",
+    subtitle: "Threshold ≥ 0.3",
+    desc: "Each match receives a confidence score (0–1). Matches below 0.3 are flagged as unmatched for manual review. Users can unpair, reassign, or create new concerns.",
+    color: "border-violet-400 dark:border-violet-600",
+    bg: "bg-violet-50 dark:bg-violet-950/30",
+    accent: "text-violet-600 dark:text-violet-400",
+    icon: AlertTriangle,
+  },
+  {
+    id: 5,
+    title: "Recurrence Aggregation",
+    subtitle: "W-6 → W-1 Rolling Window",
+    desc: "Matched defect quantities are aggregated into the W-1 (last week) bucket. The 6-week rolling window shifts forward each cycle, tracking recurrence trends over time.",
+    color: "border-green-400 dark:border-green-600",
+    bg: "bg-green-50 dark:bg-green-950/30",
     accent: "text-green-600 dark:text-green-400",
-    borderColor: "border-green-200 dark:border-green-800",
-    icon: BarChart3,
-    steps: [
-      "Recurrence aggregation per concern",
-      "MFG / Quality / Plant rating calculation",
-      "Workstation OK/NG status determination",
-      "Weekly trend tracking (W-1 to W-6)",
-    ],
+    icon: RefreshCw,
   },
   {
-    phase: "Phase 4",
-    title: "Export & Archive",
-    color: "bg-blue-100 dark:bg-blue-900/30",
+    id: 6,
+    title: "Rating Calculation",
+    subtitle: "MFG / Quality / Plant",
+    desc: "Scores from Trim (T10–T100), Chassis (C10–C80), Final (F10–F100), and QControl checkpoints are summed. MFG, Quality, and Plant ratings auto-calculate.",
+    color: "border-teal-400 dark:border-teal-600",
+    bg: "bg-teal-50 dark:bg-teal-950/30",
+    accent: "text-teal-600 dark:text-teal-400",
+    icon: BarChart3,
+  },
+  {
+    id: 7,
+    title: "Status Automation",
+    subtitle: "OK / NG Determination",
+    desc: "Workstation: NG if recurrence exists. MFG: OK if MFG Rating ≥ Defect Rating. Plant: OK if Plant Rating ≥ Defect Rating. All statuses update in real-time.",
+    color: "border-blue-400 dark:border-blue-600",
+    bg: "bg-blue-50 dark:bg-blue-950/30",
     accent: "text-blue-600 dark:text-blue-400",
-    borderColor: "border-blue-200 dark:border-blue-800",
+    icon: CheckCircle2,
+  },
+  {
+    id: 8,
+    title: "Dashboard & Export",
+    subtitle: "Visualization & Feedback",
+    desc: "Summary dashboards show NG/OK breakdowns, designation distribution, and rating analytics. Data exports to Excel/CSV. New defect uploads restart the cycle.",
+    color: "border-indigo-400 dark:border-indigo-600",
+    bg: "bg-indigo-50 dark:bg-indigo-950/30",
+    accent: "text-indigo-600 dark:text-indigo-400",
     icon: FileSpreadsheet,
-    steps: [
-      "Export to Excel / CSV",
-      "Dashboard visualization",
-      "Status monitoring (OK/NG)",
-      "Historical data retention",
-    ],
   },
 ];
 
 const techStack = [
-  { name: "React 18", desc: "Component-based UI framework", icon: Layout, category: "Frontend" },
-  { name: "TypeScript", desc: "Type-safe development", icon: Cpu, category: "Frontend" },
-  { name: "Tailwind CSS", desc: "Utility-first styling", icon: Layers, category: "Frontend" },
-  { name: "Recharts", desc: "Dashboard visualizations", icon: BarChart3, category: "Frontend" },
-  { name: "PostgreSQL", desc: "Relational database", icon: Database, category: "Backend" },
-  { name: "Edge Functions", desc: "Serverless backend logic", icon: Server, category: "Backend" },
-  { name: "Google Gemini", desc: "AI semantic matching", icon: Brain, category: "AI/NLP" },
-  { name: "XLSX Parser", desc: "Excel import/export", icon: FileSpreadsheet, category: "Data" },
-  { name: "Python / Pandas", desc: "Offline data processing", icon: Terminal, category: "Scripts" },
+  { name: "React 18", desc: "Component-based UI", icon: Layout, category: "Frontend" },
+  { name: "TypeScript", desc: "Type-safe code", icon: Cpu, category: "Frontend" },
+  { name: "Tailwind CSS", desc: "Utility styling", icon: Layers, category: "Frontend" },
+  { name: "Recharts", desc: "Data visualization", icon: BarChart3, category: "Frontend" },
+  { name: "PostgreSQL", desc: "Relational DB", icon: Database, category: "Backend" },
+  { name: "Edge Functions", desc: "Serverless logic", icon: Server, category: "Backend" },
+  { name: "Google Gemini", desc: "AI/NLP matching", icon: Brain, category: "AI/NLP" },
+  { name: "XLSX Parser", desc: "Excel I/O", icon: FileSpreadsheet, category: "Data" },
+  { name: "Python / Pandas", desc: "Offline pipeline", icon: Terminal, category: "Scripts" },
 ];
 
-const workflowSteps = [
-  {
-    title: "1. QA Matrix Setup",
-    description: "Upload your quality concern matrix via Excel. Each row represents a concern with fields like S.No, Concern Description, Operation Station, Designation, Defect Code, Location Code, and Defect Rating (1/3/5).",
-  },
-  {
-    title: "2. Defect Data Ingestion",
-    description: "Import defect reports from DVX, SCA, or YARD sources. The system parses location details, defect descriptions, gravity levels, and quantities from the uploaded files.",
-  },
-  {
-    title: "3. AI-Powered Matching",
-    description: "The Repeats tab uses Google Gemini AI to semantically match incoming defects to existing QA concerns. It analyzes defect descriptions, locations, and component types — not just keywords.",
-  },
-  {
-    title: "4. Manual Review & Pairing",
-    description: "Review AI matches, unpair incorrect assignments, reassign defects to better-fitting concerns, or create new concerns for unmatched defects. Each match shows a confidence score.",
-  },
-  {
-    title: "5. Apply to Matrix",
-    description: "Apply matched repeats to the QA Matrix. The W-1 (last week) recurrence count updates, and all dependent statuses (Workstation, MFG, Plant) auto-recalculate.",
-  },
-  {
-    title: "6. Status Calculation",
-    description: "Automatic rating logic: MFG Rating = sum(Trim + Chassis + Final). Workstation = NG if recurrence exists. Plant = NG if Plant Rating < Defect Rating.",
-  },
-  {
-    title: "7. Dashboard & Export",
-    description: "View summary dashboards with NG/OK breakdowns, designation distribution, and rating analytics. Export the full matrix as Excel or CSV at any time.",
-  },
-];
-
-const pythonScripts = [
+const pythonModules = [
   {
     file: "defect_processor.py",
-    title: "Defect Data Processing & Validation",
-    desc: "Ingests raw Excel/CSV defect files, auto-detects headers, normalizes columns, validates data quality, and deduplicates entries.",
-    cmd: "python defect_processor.py -i defects.xlsx -s DVX -o cleaned.csv --dedup",
-    functions: ["load_defect_file()", "preprocess_defects()", "validate_defects()", "separate_by_source()", "deduplicate_defects()"],
+    title: "Data Ingestion & Validation",
+    desc: "Parses raw defect files, auto-detects headers, normalizes columns, validates data quality, and deduplicates entries.",
+    functions: ["load_defect_file()", "preprocess_defects()", "validate_defects()", "deduplicate_defects()"],
   },
   {
     file: "recurrence_aggregator.py",
-    title: "Recurrence Aggregation (W-6 to W-1)",
-    desc: "Manages the 6-week rolling recurrence window. Shifts weekly buckets, aggregates defect counts into W-1, and calculates total recurrence.",
-    cmd: "python recurrence_aggregator.py -m qa_matrix.csv -d matches.csv -o updated.csv",
-    functions: ["shift_weekly_window()", "aggregate_defect_counts()", "calculate_total_recurrence()", "weekly_trend_analysis()"],
+    title: "Recurrence Aggregation",
+    desc: "Manages the 6-week rolling window, shifts weekly buckets, aggregates defect counts into W-1, and detects trends.",
+    functions: ["shift_weekly_window()", "aggregate_defect_counts()", "weekly_trend_analysis()"],
   },
   {
     file: "severity_scorer.py",
-    title: "Severity & Controllability Scoring (1-3-5)",
-    desc: "Implements the 1-3-5 defect rating scale and calculates controllability across Trim (T10-T100), Chassis (C10-C80), and Final (F10-F100) areas.",
-    cmd: "python severity_scorer.py -m qa_matrix.csv -o scored_matrix.csv",
-    functions: ["calculate_mfg_rating()", "calculate_quality_rating()", "calculate_plant_rating()", "calculate_controllability()"],
+    title: "Severity & Controllability",
+    desc: "Implements 1-3-5 defect rating and calculates controllability across Trim, Chassis, and Final assembly areas.",
+    functions: ["calculate_mfg_rating()", "calculate_quality_rating()", "calculate_plant_rating()"],
   },
   {
     file: "rating_calculator.py",
-    title: "MFG / Plant Rating Calculator",
-    desc: "Computes MFG, Quality, and Plant ratings from JSONB score data. Mirrors the TypeScript recalculateStatuses() function exactly.",
-    cmd: "python rating_calculator.py -m qa_matrix.csv -o rated.csv --report",
+    title: "MFG / Plant Ratings",
+    desc: "Computes all three ratings from JSONB score data. Mirrors the frontend recalculateStatuses() function exactly.",
     functions: ["recalculate_entry()", "batch_recalculate()", "generate_rating_report()"],
   },
   {
     file: "status_automator.py",
-    title: "OK/NG Status Automation",
-    desc: "Vectorized status computation using NumPy. Detects status transitions, generates diff reports, and applies repeat updates to the matrix.",
-    cmd: "python status_automator.py -m qa_matrix.csv -o final.csv --summary",
-    functions: ["compute_statuses_vectorized()", "detect_status_changes()", "apply_repeat_updates()", "generate_ng_summary()"],
+    title: "OK/NG Automation",
+    desc: "Vectorized status computation. Detects transitions, generates diff reports, and applies repeat updates.",
+    functions: ["compute_statuses_vectorized()", "detect_status_changes()", "generate_ng_summary()"],
   },
   {
     file: "ai_defect_matcher.py",
-    title: "AI-Assisted Defect Matching",
-    desc: "Semantic matching using fuzzy NLP (Jaccard, Dice, synonym expansion) and Google Gemini AI. Supports batch processing with fallback.",
-    cmd: "python ai_defect_matcher.py -d defects.csv -m matrix.csv --mode ai --api-key KEY",
-    functions: ["fuzzy_match_single()", "batch_fuzzy_match()", "ai_match_batch()", "aggregate_matches()"],
+    title: "AI Defect Matching",
+    desc: "Semantic matching via fuzzy NLP (Jaccard, Dice, synonym expansion) and Google Gemini AI with batch fallback.",
+    functions: ["fuzzy_match_single()", "ai_match_batch()", "aggregate_matches()"],
   },
-];
-
-// Workflow diagram nodes
-const diagramNodes = [
-  { id: "upload", label: "Excel / CSV Upload", x: 0, y: 0, color: "bg-red-100 dark:bg-red-900/40 border-red-300 dark:border-red-700" },
-  { id: "parse", label: "Header Detection & Parsing", x: 1, y: 0, color: "bg-red-100 dark:bg-red-900/40 border-red-300 dark:border-red-700" },
-  { id: "validate", label: "Validation & Cleaning", x: 2, y: 0, color: "bg-red-100 dark:bg-red-900/40 border-red-300 dark:border-red-700" },
-  { id: "separate", label: "Source Separation", x: 0, y: 1, color: "bg-purple-100 dark:bg-purple-900/40 border-purple-300 dark:border-purple-700" },
-  { id: "tokenize", label: "Tokenization & Synonym Expansion", x: 1, y: 1, color: "bg-purple-100 dark:bg-purple-900/40 border-purple-300 dark:border-purple-700" },
-  { id: "ai_match", label: "AI Semantic Matching (Gemini)", x: 2, y: 1, color: "bg-purple-100 dark:bg-purple-900/40 border-purple-300 dark:border-purple-700" },
-  { id: "confidence", label: "Confidence Filter (≥ 0.3)", x: 0, y: 2, color: "bg-purple-100 dark:bg-purple-900/40 border-purple-300 dark:border-purple-700" },
-  { id: "aggregate", label: "Recurrence Aggregation", x: 1, y: 2, color: "bg-green-100 dark:bg-green-900/40 border-green-300 dark:border-green-700" },
-  { id: "scoring", label: "MFG / Quality / Plant Scoring", x: 2, y: 2, color: "bg-green-100 dark:bg-green-900/40 border-green-300 dark:border-green-700" },
-  { id: "status", label: "OK / NG Status Automation", x: 0, y: 3, color: "bg-green-100 dark:bg-green-900/40 border-green-300 dark:border-green-700" },
-  { id: "dashboard", label: "Dashboard & Analytics", x: 1, y: 3, color: "bg-blue-100 dark:bg-blue-900/40 border-blue-300 dark:border-blue-700" },
-  { id: "export", label: "Excel / CSV Export", x: 2, y: 3, color: "bg-blue-100 dark:bg-blue-900/40 border-blue-300 dark:border-blue-700" },
 ];
 
 const HowItWorks = () => {
@@ -177,7 +150,7 @@ const HowItWorks = () => {
           </Link>
           <div>
             <h1 className="text-lg font-bold tracking-tight">How It Works</h1>
-            <p className="text-[11px] text-muted-foreground">QA Matrix — System Documentation</p>
+            <p className="text-[11px] text-muted-foreground">QA Matrix — Closed-Loop Workflow</p>
           </div>
           <Link to="/" className="ml-auto text-xs font-semibold text-primary hover:underline">
             ← Back to Matrix
@@ -189,185 +162,132 @@ const HowItWorks = () => {
         {/* Hero */}
         <section className="text-center space-y-4">
           <h2 className="text-3xl font-extrabold tracking-tight">
-            QA Matrix <span className="text-primary">Workflow</span>
+            Closed-Loop <span className="text-primary">Quality Workflow</span>
           </h2>
           <p className="text-muted-foreground max-w-2xl mx-auto text-sm leading-relaxed">
-            An end-to-end automotive quality assurance system that combines AI-powered defect matching
-            with structured concern tracking to maintain manufacturing excellence.
+            A continuous improvement cycle where defect data feeds into AI-powered matching, 
+            auto-calculates ratings and statuses, and loops back for the next inspection period.
           </p>
         </section>
 
-        {/* ═══ WORKFLOW DIAGRAM ═══ */}
+        {/* ═══ CLOSED-LOOP DIAGRAM ═══ */}
         <section className="space-y-6">
-          <h3 className="text-xl font-bold tracking-tight">Application Workflow Diagram</h3>
+          <h3 className="text-xl font-bold tracking-tight">Application Workflow</h3>
           <Card className="overflow-hidden">
-            <CardContent className="pt-6 pb-6">
-              <div className="grid grid-cols-3 gap-3">
-                {diagramNodes.map((node, i) => (
-                  <div key={node.id} className="relative">
-                    <div className={`${node.color} border-2 rounded-lg px-3 py-3 text-center transition-all hover:scale-105`}>
-                      <p className="text-xs font-bold text-foreground">{node.label}</p>
+            <CardContent className="pt-8 pb-8 px-6">
+              {/* Circular / loop layout */}
+              <div className="relative">
+                {/* Steps in a connected chain */}
+                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
+                  {closedLoopSteps.map((step, i) => (
+                    <div key={step.id} className="relative group">
+                      <div className={`${step.bg} ${step.color} border-2 rounded-xl p-4 h-full transition-all hover:shadow-md`}>
+                        <div className="flex items-center gap-2 mb-2">
+                          <div className={`w-6 h-6 rounded-full bg-card flex items-center justify-center border ${step.color}`}>
+                            <span className={`text-[10px] font-black ${step.accent}`}>{step.id}</span>
+                          </div>
+                          <step.icon className={`w-4 h-4 ${step.accent}`} />
+                        </div>
+                        <h4 className="text-xs font-bold text-foreground">{step.title}</h4>
+                        <p className={`text-[10px] font-semibold ${step.accent} mb-1.5`}>{step.subtitle}</p>
+                        <p className="text-[10px] text-muted-foreground leading-relaxed">{step.desc}</p>
+                      </div>
+                      {/* Arrow to next */}
+                      {i < closedLoopSteps.length - 1 && i % 4 !== 3 && (
+                        <div className="hidden lg:block absolute top-1/2 -right-3 -translate-y-1/2 z-10">
+                          <ArrowRight className="w-4 h-4 text-muted-foreground" />
+                        </div>
+                      )}
+                      {/* Down arrow between rows */}
+                      {i === 3 && (
+                        <div className="hidden lg:block absolute -bottom-3 left-1/2 -translate-x-1/2 z-10">
+                          <ArrowDown className="w-4 h-4 text-muted-foreground" />
+                        </div>
+                      )}
                     </div>
-                    {/* Arrows: show down arrow after every 3rd item except last row */}
-                    {i < 9 && i % 3 === 2 && (
-                      <div className="absolute -bottom-3 left-1/2 -translate-x-1/2 z-10">
-                        <ArrowDown className="w-4 h-4 text-muted-foreground" />
-                      </div>
-                    )}
-                    {/* Right arrows within row */}
-                    {i % 3 < 2 && (
-                      <div className="absolute top-1/2 -right-2 -translate-y-1/2 z-10">
-                        <ArrowRight className="w-3 h-3 text-muted-foreground" />
-                      </div>
-                    )}
+                  ))}
+                </div>
+
+                {/* Feedback loop arrow */}
+                <div className="mt-6 pt-4 border-t-2 border-dashed border-primary/30 flex items-center justify-center gap-3">
+                  <RefreshCw className="w-5 h-5 text-primary animate-spin" style={{ animationDuration: '4s' }} />
+                  <div className="text-center">
+                    <p className="text-xs font-bold text-primary">Continuous Feedback Loop</p>
+                    <p className="text-[10px] text-muted-foreground">
+                      Export triggers new data collection → Next week's defect uploads restart the cycle → 
+                      W-1 shifts to W-2, new W-1 receives fresh data
+                    </p>
                   </div>
-                ))}
-              </div>
-              {/* Legend */}
-              <div className="flex items-center justify-center gap-6 mt-6 pt-4 border-t border-border">
-                <div className="flex items-center gap-1.5">
-                  <div className="w-3 h-3 rounded bg-red-200 dark:bg-red-900/40 border border-red-300" />
-                  <span className="text-[10px] text-muted-foreground">Collection</span>
-                </div>
-                <div className="flex items-center gap-1.5">
-                  <div className="w-3 h-3 rounded bg-purple-200 dark:bg-purple-900/40 border border-purple-300" />
-                  <span className="text-[10px] text-muted-foreground">Matching</span>
-                </div>
-                <div className="flex items-center gap-1.5">
-                  <div className="w-3 h-3 rounded bg-green-200 dark:bg-green-900/40 border border-green-300" />
-                  <span className="text-[10px] text-muted-foreground">Calculation</span>
-                </div>
-                <div className="flex items-center gap-1.5">
-                  <div className="w-3 h-3 rounded bg-blue-200 dark:bg-blue-900/40 border border-blue-300" />
-                  <span className="text-[10px] text-muted-foreground">Export</span>
+                  <RefreshCw className="w-5 h-5 text-primary animate-spin" style={{ animationDuration: '4s', animationDirection: 'reverse' }} />
                 </div>
               </div>
             </CardContent>
           </Card>
-        </section>
-
-        {/* 4-Phase Pipeline */}
-        <section className="space-y-6">
-          <h3 className="text-xl font-bold tracking-tight">Data Pipeline</h3>
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
-            {phases.map((p, i) => (
-              <Card key={i} className={`${p.borderColor} border-2 relative overflow-hidden`}>
-                <div className={`${p.color} px-4 py-3`}>
-                  <span className={`text-[10px] font-bold uppercase tracking-widest ${p.accent}`}>{p.phase}</span>
-                  <h4 className="text-sm font-bold mt-0.5">{p.title}</h4>
-                </div>
-                <CardContent className="pt-4 pb-4 space-y-2">
-                  {p.steps.map((s, j) => (
-                    <div key={j} className="flex items-start gap-2 text-xs">
-                      <CheckCircle2 className={`w-3.5 h-3.5 mt-0.5 flex-shrink-0 ${p.accent}`} />
-                      <span className="text-foreground/80">{s}</span>
-                    </div>
-                  ))}
-                </CardContent>
-                {i < phases.length - 1 && (
-                  <ArrowRight className="hidden lg:block absolute -right-3 top-1/2 -translate-y-1/2 w-5 h-5 text-muted-foreground z-10" />
-                )}
-              </Card>
-            ))}
-          </div>
-        </section>
-
-        {/* Detailed Workflow */}
-        <section className="space-y-6">
-          <h3 className="text-xl font-bold tracking-tight">Detailed Workflow</h3>
-          <div className="space-y-4">
-            {workflowSteps.map((step, i) => (
-              <div key={i} className="flex gap-4 items-start">
-                <div className="w-8 h-8 rounded-full bg-primary/10 flex items-center justify-center flex-shrink-0 mt-0.5">
-                  <span className="text-xs font-bold text-primary">{i + 1}</span>
-                </div>
-                <div>
-                  <h4 className="text-sm font-bold">{step.title}</h4>
-                  <p className="text-xs text-muted-foreground mt-1 leading-relaxed max-w-2xl">{step.description}</p>
-                </div>
-              </div>
-            ))}
-          </div>
         </section>
 
         {/* Status Calculation Logic */}
         <section className="space-y-6">
-          <h3 className="text-xl font-bold tracking-tight">Status Calculation Logic</h3>
+          <h3 className="text-xl font-bold tracking-tight">Status Calculation Rules</h3>
           <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-            <Card>
+            <Card className="border-l-4 border-l-primary">
               <CardHeader className="pb-2">
                 <CardTitle className="text-sm">MFG Rating</CardTitle>
               </CardHeader>
-              <CardContent className="text-xs text-muted-foreground space-y-1">
-                <p><code className="bg-muted px-1 rounded font-mono">sum(Trim) + sum(Chassis) + sum(Final)</code></p>
-                <p>OK if MFG Rating ≥ Defect Rating</p>
+              <CardContent className="text-xs text-muted-foreground space-y-2">
+                <p><code className="bg-muted px-1.5 py-0.5 rounded font-mono text-foreground/70">sum(Trim) + sum(Chassis) + sum(Final)</code></p>
+                <p className="flex items-center gap-1.5"><span className="w-2 h-2 rounded-full bg-green-500" /> OK if MFG Rating ≥ Defect Rating</p>
+                <p className="flex items-center gap-1.5"><span className="w-2 h-2 rounded-full bg-destructive" /> NG otherwise</p>
               </CardContent>
             </Card>
-            <Card>
+            <Card className="border-l-4 border-l-primary">
               <CardHeader className="pb-2">
-                <CardTitle className="text-sm">Quality Rating</CardTitle>
+                <CardTitle className="text-sm">Workstation Status</CardTitle>
               </CardHeader>
-              <CardContent className="text-xs text-muted-foreground space-y-1">
-                <p><code className="bg-muted px-1 rounded font-mono">sum(QControl scores)</code></p>
-                <p>Combines all 11 control checkpoints</p>
+              <CardContent className="text-xs text-muted-foreground space-y-2">
+                <p><code className="bg-muted px-1.5 py-0.5 rounded font-mono text-foreground/70">weeklyRecurrence.some(w → w &gt; 0)</code></p>
+                <p className="flex items-center gap-1.5"><span className="w-2 h-2 rounded-full bg-destructive" /> NG if any recurrence exists</p>
+                <p className="flex items-center gap-1.5"><span className="w-2 h-2 rounded-full bg-green-500" /> OK if no recurrence + MFG OK</p>
               </CardContent>
             </Card>
-            <Card>
+            <Card className="border-l-4 border-l-primary">
               <CardHeader className="pb-2">
                 <CardTitle className="text-sm">Plant Status</CardTitle>
               </CardHeader>
-              <CardContent className="text-xs text-muted-foreground space-y-1">
-                <p><code className="bg-muted px-1 rounded font-mono">ResidualTorque + QControl + QDetail</code></p>
-                <p>NG if Plant Rating &lt; Defect Rating</p>
+              <CardContent className="text-xs text-muted-foreground space-y-2">
+                <p><code className="bg-muted px-1.5 py-0.5 rounded font-mono text-foreground/70">ResidualTorque + QControl + QDetail</code></p>
+                <p className="flex items-center gap-1.5"><span className="w-2 h-2 rounded-full bg-green-500" /> OK if Plant Rating ≥ Defect Rating</p>
+                <p className="flex items-center gap-1.5"><span className="w-2 h-2 rounded-full bg-destructive" /> NG otherwise</p>
               </CardContent>
             </Card>
           </div>
         </section>
 
-        {/* ═══ PYTHON SCRIPTS SECTION ═══ */}
+        {/* ═══ PYTHON MODULES ═══ */}
         <section className="space-y-6">
           <div className="flex items-center gap-3">
-            <div className="p-2 rounded-lg bg-yellow-100 dark:bg-yellow-900/30">
-              <Code2 className="w-5 h-5 text-yellow-600 dark:text-yellow-400" />
+            <div className="p-2 rounded-lg bg-primary/10">
+              <Code2 className="w-5 h-5 text-primary" />
             </div>
             <div>
-              <h3 className="text-xl font-bold tracking-tight">Python Processing Scripts</h3>
-              <p className="text-xs text-muted-foreground">Standalone pipeline scripts in <code className="bg-muted px-1 rounded font-mono">python/</code> directory</p>
+              <h3 className="text-xl font-bold tracking-tight">Python Processing Modules</h3>
+              <p className="text-xs text-muted-foreground">Standalone scripts mirroring the application's closed-loop logic</p>
             </div>
           </div>
 
-          {/* Pipeline command */}
-          <Card className="bg-muted/50 border-dashed">
-            <CardContent className="pt-4 pb-4">
-              <p className="text-[10px] font-bold uppercase tracking-widest text-muted-foreground mb-2">Full Pipeline Command</p>
-              <div className="font-mono text-xs space-y-1 text-foreground/80">
-                <p>$ pip install -r python/requirements.txt</p>
-                <p>$ python python/defect_processor.py -i defects.xlsx -s DVX -o cleaned.csv</p>
-                <p>$ python python/ai_defect_matcher.py -d cleaned.csv -m matrix.csv -o matches.csv</p>
-                <p>$ python python/recurrence_aggregator.py -m matrix.csv -d matches.csv -o updated.csv</p>
-                <p>$ python python/rating_calculator.py -m updated.csv -o rated.csv --report</p>
-                <p>$ python python/status_automator.py -m rated.csv -o final.csv --summary</p>
-              </div>
-            </CardContent>
-          </Card>
-
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-            {pythonScripts.map((script, i) => (
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+            {pythonModules.map((mod, i) => (
               <Card key={i} className="hover:border-primary/30 transition-colors">
                 <CardHeader className="pb-2">
                   <CardTitle className="text-sm flex items-center gap-2">
-                    <Terminal className="w-4 h-4 text-yellow-600 dark:text-yellow-400" />
-                    {script.file}
+                    <Terminal className="w-4 h-4 text-primary" />
+                    {mod.title}
                   </CardTitle>
-                  <p className="text-xs font-semibold text-foreground/80">{script.title}</p>
+                  <p className="text-[10px] font-mono text-muted-foreground">{mod.file}</p>
                 </CardHeader>
                 <CardContent className="space-y-3">
-                  <p className="text-xs text-muted-foreground leading-relaxed">{script.desc}</p>
-                  <div className="bg-muted/60 rounded-md px-3 py-2">
-                    <p className="font-mono text-[10px] text-foreground/70 break-all">$ {script.cmd}</p>
-                  </div>
+                  <p className="text-xs text-muted-foreground leading-relaxed">{mod.desc}</p>
                   <div className="flex flex-wrap gap-1">
-                    {script.functions.map((fn, j) => (
+                    {mod.functions.map((fn, j) => (
                       <span key={j} className="text-[9px] font-mono bg-primary/10 text-primary px-1.5 py-0.5 rounded">
                         {fn}
                       </span>
@@ -411,34 +331,34 @@ const HowItWorks = () => {
                     <Layout className="w-6 h-6 text-primary" />
                   </div>
                   <h4 className="text-sm font-bold">Frontend</h4>
-                  <p className="text-xs text-muted-foreground">React SPA with QA Matrix Table, Repeats Tab, Defect Upload, Dashboard views. All state managed via React hooks and TanStack Query.</p>
+                  <p className="text-xs text-muted-foreground">React SPA with QA Matrix Table, Repeats Tab, Defect Upload, and Dashboard views. State managed via hooks and TanStack Query.</p>
                 </div>
                 <div className="space-y-3">
                   <div className="p-3 rounded-xl bg-primary/10 inline-block">
                     <Server className="w-6 h-6 text-primary" />
                   </div>
                   <h4 className="text-sm font-bold">Backend</h4>
-                  <p className="text-xs text-muted-foreground">PostgreSQL database with 3 tables (qa_matrix_entries, defect_data, final_defect). Edge Functions for AI matching and defect management.</p>
+                  <p className="text-xs text-muted-foreground">PostgreSQL with 3 tables (qa_matrix_entries, defect_data, final_defect). Edge Functions handle AI matching and defect management.</p>
                 </div>
                 <div className="space-y-3">
                   <div className="p-3 rounded-xl bg-primary/10 inline-block">
                     <Brain className="w-6 h-6 text-primary" />
                   </div>
                   <h4 className="text-sm font-bold">AI/NLP Layer</h4>
-                  <p className="text-xs text-muted-foreground">Google Gemini via Edge Functions for semantic defect matching. Uses tool-calling for structured output with confidence scoring.</p>
+                  <p className="text-xs text-muted-foreground">Google Gemini via Edge Functions for semantic defect matching. Tool-calling extracts structured output with confidence scoring.</p>
                 </div>
               </div>
             </CardContent>
           </Card>
         </section>
 
-        {/* Edge Functions */}
+        {/* Backend Functions */}
         <section className="space-y-6">
           <h3 className="text-xl font-bold tracking-tight">Backend Functions</h3>
           <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
             <Card>
               <CardHeader className="pb-2"><CardTitle className="text-sm flex items-center gap-2"><Brain className="w-4 h-4" /> match-defects</CardTitle></CardHeader>
-              <CardContent className="text-xs text-muted-foreground">Sends batches of defects + concerns to Google Gemini. Returns semantic matches with confidence scores via tool-calling.</CardContent>
+              <CardContent className="text-xs text-muted-foreground">Sends batched defects + concerns to Google Gemini. Returns semantic matches with confidence scores via tool-calling.</CardContent>
             </Card>
             <Card>
               <CardHeader className="pb-2"><CardTitle className="text-sm flex items-center gap-2"><Database className="w-4 h-4" /> delete-defects</CardTitle></CardHeader>
