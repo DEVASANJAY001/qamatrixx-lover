@@ -1,5 +1,6 @@
 import { useState, useMemo, useCallback } from "react";
 import { Link } from "react-router-dom";
+import Footer from "@/components/Footer";
 import Dashboard from "@/components/Dashboard";
 import MatrixDashboard from "@/components/MatrixDashboard";
 import QAMatrixTable from "@/components/QAMatrixTable";
@@ -510,6 +511,8 @@ const Index = () => {
         onUndo={handleUndoApply}
         isApplied={isRepeatApplied}
       />
+
+      <Footer />
     </div>
   );
 };
