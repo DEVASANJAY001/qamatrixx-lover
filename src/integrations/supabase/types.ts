@@ -19,6 +19,7 @@ export type Database = {
           defect_code: string
           defect_description_details: string
           defect_location_code: string
+          gravity: string | null
           id: string
           source: string
           uploaded_at: string
@@ -27,6 +28,7 @@ export type Database = {
           defect_code?: string
           defect_description_details?: string
           defect_location_code?: string
+          gravity?: string | null
           id?: string
           source: string
           uploaded_at?: string
@@ -35,6 +37,7 @@ export type Database = {
           defect_code?: string
           defect_description_details?: string
           defect_location_code?: string
+          gravity?: string | null
           id?: string
           source?: string
           uploaded_at?: string
@@ -47,6 +50,7 @@ export type Database = {
           defect_code: string
           defect_description_details: string
           defect_location_code: string
+          gravity: string | null
           id: string
           source: string
         }
@@ -55,6 +59,7 @@ export type Database = {
           defect_code?: string
           defect_description_details?: string
           defect_location_code?: string
+          gravity?: string | null
           id?: string
           source?: string
         }
@@ -63,6 +68,7 @@ export type Database = {
           defect_code?: string
           defect_description_details?: string
           defect_location_code?: string
+          gravity?: string | null
           id?: string
           source?: string
         }
