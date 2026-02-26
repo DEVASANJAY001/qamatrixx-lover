@@ -44,6 +44,66 @@ export type Database = {
         }
         Relationships: []
       }
+      dvx_defects: {
+        Row: {
+          created_at: string
+          defect_code: string
+          defect_description: string
+          defect_description_details: string
+          gravity: string
+          id: string
+          location_code: string
+          location_details: string
+          match_score: number | null
+          pairing_method: string | null
+          pairing_status: string
+          pof_code: string
+          pof_family: string
+          qa_matrix_sno: number | null
+          quantity: number
+          responsible: string
+          source: string
+        }
+        Insert: {
+          created_at?: string
+          defect_code?: string
+          defect_description?: string
+          defect_description_details?: string
+          gravity?: string
+          id?: string
+          location_code?: string
+          location_details?: string
+          match_score?: number | null
+          pairing_method?: string | null
+          pairing_status?: string
+          pof_code?: string
+          pof_family?: string
+          qa_matrix_sno?: number | null
+          quantity?: number
+          responsible?: string
+          source?: string
+        }
+        Update: {
+          created_at?: string
+          defect_code?: string
+          defect_description?: string
+          defect_description_details?: string
+          gravity?: string
+          id?: string
+          location_code?: string
+          location_details?: string
+          match_score?: number | null
+          pairing_method?: string | null
+          pairing_status?: string
+          pof_code?: string
+          pof_family?: string
+          qa_matrix_sno?: number | null
+          quantity?: number
+          responsible?: string
+          source?: string
+        }
+        Relationships: []
+      }
       final_defect: {
         Row: {
           created_at: string

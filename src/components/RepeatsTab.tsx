@@ -82,6 +82,8 @@ const RepeatsTab = ({
     fetchDates();
   }, [dvxEntries]);
 
+  const [pairingMode, setPairingMode] = useState<"code" | "semantic" | null>(null);
+
   const handleStartPairing = async () => {
     setPairingLoading(true);
     try {
@@ -97,7 +99,6 @@ const RepeatsTab = ({
         return;
       }
 
-      // Convert final_defect rows to DVXEntry format for the matching engine
       const entries: DVXEntry[] = finalDefects.map((d, idx) => ({
         date: new Date(d.created_at).toLocaleDateString(),
         locationDetails: d.defect_location_code || "",
@@ -118,6 +119,47 @@ const RepeatsTab = ({
       toast({ title: "Error", description: err.message, variant: "destructive" });
     } finally {
       setPairingLoading(false);
+    }
+  };
+
+  const handlePairByCode = async () => {
+    setPairingMode("code");
+    setPairingLoading(true);
+    try {
+      const { data, error } = await supabase.functions.invoke("pair-by-code");
+      if (error) throw error;
+      if (data?.error) throw new Error(data.error);
+      toast({
+        title: "Code-Based Pairing Complete",
+        description: `${data.paired} paired, ${data.unpaired} not paired`,
+      });
+      // Reload pairing from DB
+      handleStartPairing();
+    } catch (err: any) {
+      toast({ title: "Pairing Failed", description: err.message, variant: "destructive" });
+    } finally {
+      setPairingLoading(false);
+      setPairingMode(null);
+    }
+  };
+
+  const handlePairBySemantic = async () => {
+    setPairingMode("semantic");
+    setPairingLoading(true);
+    try {
+      const { data, error } = await supabase.functions.invoke("pair-by-semantic");
+      if (error) throw error;
+      if (data?.error) throw new Error(data.error);
+      toast({
+        title: "Semantic AI Pairing Complete",
+        description: `${data.paired} paired, ${data.unpaired} not paired`,
+      });
+      handleStartPairing();
+    } catch (err: any) {
+      toast({ title: "AI Pairing Failed", description: err.message, variant: "destructive" });
+    } finally {
+      setPairingLoading(false);
+      setPairingMode(null);
     }
   };
   const fileRef = useRef<HTMLInputElement>(null);
@@ -377,17 +419,43 @@ const RepeatsTab = ({
               </div>
             </div>
           </div>
-          <div className="flex items-center gap-2">
+          <div className="flex items-center gap-2 flex-wrap">
             <Button
               size="sm"
+              variant="outline"
+              className="gap-1.5"
+              onClick={handlePairByCode}
+              disabled={pairingLoading || isAIMatching}
+            >
+              {pairingMode === "code" ? (
+                <><Loader2 className="w-4 h-4 animate-spin" />Pairing by Code...</>
+              ) : (
+                <><Link2 className="w-4 h-4" />Pair with Code</>
+              )}
+            </Button>
+            <Button
+              size="sm"
+              className="gap-1.5"
+              onClick={handlePairBySemantic}
+              disabled={pairingLoading || isAIMatching}
+            >
+              {pairingMode === "semantic" ? (
+                <><Loader2 className="w-4 h-4 animate-spin" />AI Matching...</>
+              ) : (
+                <><Brain className="w-4 h-4" />Pair with Semantic AI</>
+              )}
+            </Button>
+            <Button
+              size="sm"
+              variant="secondary"
               className="gap-1.5"
               onClick={handleStartPairing}
               disabled={pairingLoading || isAIMatching}
             >
-              {pairingLoading ? (
-                <><Loader2 className="w-4 h-4 animate-spin" />Loading Defects...</>
+              {pairingLoading && !pairingMode ? (
+                <><Loader2 className="w-4 h-4 animate-spin" />Loading...</>
               ) : (
-                <><Play className="w-4 h-4" />Start Pairing</>
+                <><Play className="w-4 h-4" />Load & Match</>
               )}
             </Button>
             {fileName && (
@@ -399,7 +467,7 @@ const RepeatsTab = ({
         </div>
 
         <p className="text-xs text-muted-foreground mb-4">
-          Click <strong>Start Pairing</strong> to fetch defect data and match it with QA Matrix concerns using AI. Or upload a file manually below.
+          Use <strong>Pair with Code</strong> for exact defect_code + location_code matching, or <strong>Pair with Semantic AI</strong> for description-based intelligent matching. <strong>Load & Match</strong> fetches defect data and runs the legacy AI matcher.
         </p>
 
         {/* Mode toggle */}
